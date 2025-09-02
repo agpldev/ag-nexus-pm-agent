@@ -81,3 +81,6 @@ target/
 
 # Project-specific
 nexus_agent.egg-info/
+
+# Build artifacts
+*.egg-info/
