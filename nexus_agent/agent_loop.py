@@ -24,6 +24,13 @@ from loguru import logger
 
 from .config import ZohoConfig, load_zoho_config
 from .errors import is_retryable
+from .metrics import (
+    add_rate_limit_sleep,
+    inc_retries,
+    inc_retry_exhausted,
+    inc_tasks_created,
+    inc_tasks_skipped_dedupe,
+)
 from .services.projects import ProjectsService
 from .services.workdrive import WDFile, WorkDriveService
 from .zoho_client import ZohoClient
@@ -193,6 +200,7 @@ class TokenBucket:
             needed = amount - self.tokens
             sleep_for = needed / self.rate
             logger.info("Rate limit: sleeping {:.3f}s", sleep_for)
+            add_rate_limit_sleep(sleep_for)
             time.sleep(sleep_for)
 
 
@@ -214,6 +222,7 @@ def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0, retry
             last_exc = exc
             # stop if last attempt, or predicate says not retryable
             if i == attempts - 1 or (retry_if is not None and not retry_if(exc)):
+                inc_retry_exhausted()
                 raise
             # jittered backoff
             jitter = random.uniform(0.5, 1.5)
@@ -225,6 +234,7 @@ def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0, retry
                 exc,
                 sleep_for,
             )
+            inc_retries()
             time.sleep(sleep_for)
             delay *= factor
     assert last_exc is not None
@@ -317,6 +327,7 @@ def run_once(cfg: ZohoConfig) -> None:
                                         portal_id,
                                         project_id,
                                     )
+                                    inc_tasks_skipped_dedupe()
                                     continue
                                 # rate limit task creation
                                 task_bucket.consume()
@@ -339,6 +350,7 @@ def run_once(cfg: ZohoConfig) -> None:
                                     portal_id,
                                     project_id,
                                 )
+                                inc_tasks_created()
                                 created_task_keys.add(key)
                             except Exception as exc:  # noqa: BLE001
                                 logger.error("Failed to create task: {}", exc)
@@ -388,6 +400,7 @@ def run_once(cfg: ZohoConfig) -> None:
                                 portal_id,
                                 project_id,
                             )
+                            inc_tasks_skipped_dedupe()
                             continue
                         # rate limit task creation
                         task_bucket.consume()
@@ -410,6 +423,7 @@ def run_once(cfg: ZohoConfig) -> None:
                             portal_id,
                             project_id,
                         )
+                        inc_tasks_created()
                         created_task_keys.add(key)
                     except Exception as exc:  # noqa: BLE001
                         logger.error("Failed to create task: {}", exc)
