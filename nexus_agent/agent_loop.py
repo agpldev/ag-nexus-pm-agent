@@ -23,6 +23,7 @@ from typing import Protocol
 from loguru import logger
 
 from .config import ZohoConfig, load_zoho_config
+from .errors import is_retryable
 from .services.projects import ProjectsService
 from .services.workdrive import WDFile, WorkDriveService
 from .zoho_client import ZohoClient
@@ -195,7 +196,7 @@ class TokenBucket:
             time.sleep(sleep_for)
 
 
-def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0):  # type: ignore[no-untyped-def]
+def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0, retry_if=None):  # type: ignore[no-untyped-def]
     """Simple exponential backoff retry for transient failures.
 
     Args:
@@ -211,7 +212,8 @@ def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0):  # t
             return func()
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
-            if i == attempts - 1:
+            # stop if last attempt, or predicate says not retryable
+            if i == attempts - 1 or (retry_if is not None and not retry_if(exc)):
                 raise
             # jittered backoff
             jitter = random.uniform(0.5, 1.5)
@@ -277,6 +279,7 @@ def run_once(cfg: ZohoConfig) -> None:
                 partial(workdrive.list_files, folder_id, limit=50),
                 attempts=_env_retry_attempts(),
                 base_delay=_env_retry_base_delay(),
+                retry_if=is_retryable,
             )
             for f in files:
                 issues = _assess_wdfile_quality(f)
@@ -327,6 +330,7 @@ def run_once(cfg: ZohoConfig) -> None:
                                     ),
                                     attempts=_env_retry_attempts(),
                                     base_delay=_env_retry_base_delay(),
+                                    retry_if=is_retryable,
                                 )
                                 logger.info(
                                     "Created Zoho task {} for {} (portal={}, project={})",
@@ -397,6 +401,7 @@ def run_once(cfg: ZohoConfig) -> None:
                             ),
                             attempts=_env_retry_attempts(),
                             base_delay=_env_retry_base_delay(),
+                            retry_if=is_retryable,
                         )
                         logger.info(
                             "Created Zoho task {} for {} (portal={}, project={})",
