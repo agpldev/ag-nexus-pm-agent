@@ -56,7 +56,9 @@ uv run pytest -q --cov=nexus_agent --cov-report=term-missing --cov-fail-under=80
 ## Branching
 
 - No direct pushes to main.
-- Create feature branches from latest main and open a PR.
+- Default branch is `develop` for daily work. Direct pushes allowed; CI checks must pass.
+- Create feature branches from latest `develop` and open a PR into `develop` when collaboration is needed.
+- Periodically create PRs from `develop` to `main` for releases; `main` requires code owner review and passing CI.
 
 ## Releasing
 
