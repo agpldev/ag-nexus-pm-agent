@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from .config import ZohoConfig, load_zoho_config
+from .services.projects import ProjectsService
 from .services.workdrive import WDFile, WorkDriveService
 from .zoho_client import ZohoClient
 
@@ -75,6 +76,23 @@ def run_once(cfg: ZohoConfig) -> None:
     logger.info("Zoho API base resolved to {}", tokens.api_domain)
 
     use_live = os.environ.get("NEXUS_USE_LIVE_APIS", "false").lower() in {"1", "true", "yes"}
+
+    # Optional: list projects for visibility/debugging using Zoho Projects
+    if os.environ.get("NEXUS_LIST_PROJECTS", "false").lower() in {"1", "true", "yes"}:
+        portal_id = os.environ.get("ZOHO_PORTAL_ID")
+        if not portal_id:
+            logger.warning(
+                "NEXUS_LIST_PROJECTS=true but ZOHO_PORTAL_ID not set; skipping projects list",
+            )
+        else:
+            try:
+                proj_svc = ProjectsService(client)
+                projs = proj_svc.list_portal_projects(portal_id, limit=10)
+                logger.info("Projects in portal {}: {}", portal_id, len(projs))
+                for p in projs:
+                    print(f"- Project: {p.name} (id={p.id})")
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Failed to list projects: {}", exc)
 
     if use_live:
         # Live path: list files via WorkDrive for a configured folder
