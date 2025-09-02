@@ -107,7 +107,27 @@ def _assess_document_quality(doc: Document) -> list[str]:
 def _assess_wdfile_quality(file: WDFile) -> list[str]:
     """Assess quality of a WorkDrive file using the default analyzer."""
     analyzer = get_default_analyzer()
-    return analyzer.assess(file.name)
+    issues = analyzer.assess(file.name)
+
+    # MIME-based heuristics (best-effort based on metadata only)
+    mime = file.mime_type or None
+    if mime is None:
+        issues.append("Missing MIME type")
+    else:
+        lower = file.name.lower()
+        if lower.endswith(".pdf") and not mime.startswith("application/pdf"):
+            issues.append("Extension .pdf but MIME is not application/pdf")
+        if lower.endswith(".docx") and not mime.startswith(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ):
+            issues.append(
+                "Extension .docx but MIME is not "
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        if lower.endswith(".txt") and not mime.startswith("text/"):
+            issues.append("Extension .txt but MIME is not text/*")
+
+    return issues
 
 
 def run_once(cfg: ZohoConfig) -> None:
