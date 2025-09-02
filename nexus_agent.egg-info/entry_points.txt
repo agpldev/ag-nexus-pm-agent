@@ -1,2 +1,0 @@
-[console_scripts]
-nexus-agent = nexus_agent.agent_loop:main
