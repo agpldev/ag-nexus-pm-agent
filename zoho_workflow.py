@@ -78,7 +78,7 @@ def draft_email_to_author(document, issues):
     body = f"""
     Hello,
 
-    I have reviewed the document '{document['name']}' that you uploaded to the project.
+    I have reviewed the document '{document["name"]}' that you uploaded to the project.
     I have the following queries and requests for clarification:
 
     - {"- ".join(issues)}

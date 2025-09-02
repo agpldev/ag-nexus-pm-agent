@@ -234,7 +234,7 @@ def main() -> None:
                 "without forcing consent."
             )
         if access:
-            print("Note: access_token expires; use refresh_token for long-term " "access.")
+            print("Note: access_token expires; use refresh_token for long-term access.")
         return
 
     parser.print_help()
