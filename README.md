@@ -55,4 +55,23 @@ Set environment variables to toggle behavior when running `nexus_agent.agent_loo
 Zoho credentials and endpoints are read from environment via `nexus_agent.config.load_zoho_config()`:
 
 - `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` (required)
-- `ZOHO_ACCOUNTS_BASE` (optional; default `https://accounts.zoho.com`)
+- `ZOHO_SCOPES` (space-separated scopes used when authorizing the refresh token)
+- `ZOHO_REDIRECT_URI` (must match the URI configured in Zoho Developer Console)
+- `ZOHO_ACCOUNTS_BASE` (region base; default `https://accounts.zoho.com`)
+
+### Task creation and retries
+
+- `NEXUS_CREATE_TASKS` = `true|false`
+  - When true, the agent creates a Zoho Projects task per document/file with issues.
+  - Requires `ZOHO_PORTAL_ID` and `ZOHO_PROJECT_ID`.
+- `ZOHO_PROJECT_ID` = `<project_id>`
+  - Target project for task creation.
+- Retry/backoff tunables:
+  - `NEXUS_RETRY_ATTEMPTS` (default `3`, range `1-10`)
+  - `NEXUS_RETRY_BASE_DELAY_MS` (default `500` ms)
+
+Behavior:
+
+- The agent applies jittered exponential backoff to WorkDrive listing and Projects task creation.
+- Per-run task de-duplication prevents creating duplicate tasks for the same `(portal, project, title)`
+  combination within one execution.

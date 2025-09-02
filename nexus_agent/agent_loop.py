@@ -221,6 +221,7 @@ def run_once(cfg: ZohoConfig) -> None:
     if use_live:
         # Live path: list files via WorkDrive for a configured folder
         workdrive = WorkDriveService(client)
+        created_task_keys: set[tuple[str, str, str]] = set()
 
         folder_id: str | None = os.environ.get("WORKDRIVE_FOLDER_ID")
         if not folder_id:
@@ -261,6 +262,16 @@ def run_once(cfg: ZohoConfig) -> None:
                                 proj_svc = ProjectsService(client)
                                 title = f"Doc issues: {f.name}"
                                 desc = draft.body
+                                key = (portal_id, project_id, title)
+                                if key in created_task_keys:
+                                    logger.info(
+                                        "Skipping duplicate task creation for {} "
+                                        "(portal={}, project={})",
+                                        f.name,
+                                        portal_id,
+                                        project_id,
+                                    )
+                                    continue
                                 task_id = _retry(
                                     partial(
                                         proj_svc.create_task,
@@ -279,6 +290,7 @@ def run_once(cfg: ZohoConfig) -> None:
                                     portal_id,
                                     project_id,
                                 )
+                                created_task_keys.add(key)
                             except Exception as exc:  # noqa: BLE001
                                 logger.error("Failed to create task: {}", exc)
                         else:
@@ -291,6 +303,7 @@ def run_once(cfg: ZohoConfig) -> None:
 
     # Mock fallback path (no live APIs)
     docs = _mock_list_documents()
+    created_task_keys: set[tuple[str, str, str]] = set()
     for doc in docs:
         issues = _assess_document_quality(doc)
         if issues:
@@ -318,6 +331,15 @@ def run_once(cfg: ZohoConfig) -> None:
                         proj_svc = ProjectsService(ZohoClient(cfg))
                         title = f"Doc issues: {doc.name}"
                         desc = draft.body
+                        key = (portal_id, project_id, title)
+                        if key in created_task_keys:
+                            logger.info(
+                                "Skipping duplicate task creation for {} (portal={}, project={})",
+                                doc.name,
+                                portal_id,
+                                project_id,
+                            )
+                            continue
                         task_id = _retry(
                             partial(
                                 proj_svc.create_task,
@@ -336,6 +358,7 @@ def run_once(cfg: ZohoConfig) -> None:
                             portal_id,
                             project_id,
                         )
+                        created_task_keys.add(key)
                     except Exception as exc:  # noqa: BLE001
                         logger.error("Failed to create task: {}", exc)
                 else:
