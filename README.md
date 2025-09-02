@@ -38,3 +38,21 @@ Notes:
 ## Contributing
 
 See `CONTRIBUTING.md` and code ownership in `.github/CODEOWNERS`.
+
+## Agent runtime options
+
+Set environment variables to toggle behavior when running `nexus_agent.agent_loop`:
+
+- `NEXUS_USE_LIVE_APIS` = `true|false`
+  - When true and `WORKDRIVE_FOLDER_ID` is set, lists files from Zoho WorkDrive and drafts email output for any issues found.
+- `WORKDRIVE_FOLDER_ID` = `<folder_id>`
+  - Required when using live WorkDrive listing.
+- `NEXUS_LIST_PROJECTS` = `true|false`
+  - When true, the agent lists projects from Zoho Projects for the portal specified below.
+- `ZOHO_PORTAL_ID` = `<portal_id>`
+  - Portal identifier for Zoho Projects listing.
+
+Zoho credentials and endpoints are read from environment via `nexus_agent.config.load_zoho_config()`:
+
+- `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` (required)
+- `ZOHO_ACCOUNTS_BASE` (optional; default `https://accounts.zoho.com`)
