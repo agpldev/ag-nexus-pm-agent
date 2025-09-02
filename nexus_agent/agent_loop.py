@@ -14,7 +14,10 @@ Extend this module to orchestrate multi-step tasks across:
 from __future__ import annotations
 
 import os
+import random
+import time
 from dataclasses import dataclass
+from functools import partial
 from typing import Protocol
 
 from loguru import logger
@@ -130,6 +133,60 @@ def _assess_wdfile_quality(file: WDFile) -> list[str]:
     return issues
 
 
+def _env_retry_attempts() -> int:
+    """Read max retry attempts from env with sane defaults."""
+    raw = os.environ.get("NEXUS_RETRY_ATTEMPTS", "3")
+    try:
+        val = int(raw)
+        return max(1, min(val, 10))
+    except ValueError:
+        return 3
+
+
+def _env_retry_base_delay() -> float:
+    """Base delay in seconds derived from ms env var (default 500ms)."""
+    raw = os.environ.get("NEXUS_RETRY_BASE_DELAY_MS", "500")
+    try:
+        ms = float(raw)
+        return max(0.05, min(ms, 5000.0)) / 1000.0
+    except ValueError:
+        return 0.5
+
+
+def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0):  # type: ignore[no-untyped-def]
+    """Simple exponential backoff retry for transient failures.
+
+    Args:
+        func: Zero-arg callable to execute.
+        attempts: Max attempts including the first try.
+        base_delay: Initial delay in seconds between retries.
+        factor: Backoff multiplier.
+    """
+    last_exc: Exception | None = None
+    delay = base_delay
+    for i in range(attempts):
+        try:
+            return func()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if i == attempts - 1:
+                raise
+            # jittered backoff
+            jitter = random.uniform(0.5, 1.5)
+            sleep_for = delay * jitter
+            logger.warning(
+                "Attempt {}/{} failed: {}. Retrying in {:.2f}s",
+                i + 1,
+                attempts,
+                exc,
+                sleep_for,
+            )
+            time.sleep(sleep_for)
+            delay *= factor
+    assert last_exc is not None
+    raise last_exc
+
+
 def run_once(cfg: ZohoConfig) -> None:
     """Run a single agent iteration.
 
@@ -172,12 +229,21 @@ def run_once(cfg: ZohoConfig) -> None:
             )
         else:
             logger.info("Listing WorkDrive files from folder {}", folder_id)
-            files = workdrive.list_files(folder_id, limit=50)
+            files = _retry(
+                partial(workdrive.list_files, folder_id, limit=50),
+                attempts=_env_retry_attempts(),
+                base_delay=_env_retry_base_delay(),
+            )
             for f in files:
                 issues = _assess_wdfile_quality(f)
                 if issues:
                     draft = make_email_draft("project-docs@example.com", f.name, issues)
-                    logger.info("Drafting email for {}: {} issues", f.name, len(issues))
+                    logger.info(
+                        "Drafting email for {}: {} issues (file_id={})",
+                        f.name,
+                        len(issues),
+                        f.id,
+                    )
                     print("--- New Email Draft ---")
                     print(f"To: {draft.to}")
                     print(f"Subject: {draft.subject}")
@@ -195,13 +261,24 @@ def run_once(cfg: ZohoConfig) -> None:
                                 proj_svc = ProjectsService(client)
                                 title = f"Doc issues: {f.name}"
                                 desc = draft.body
-                                task_id = proj_svc.create_task(
+                                task_id = _retry(
+                                    partial(
+                                        proj_svc.create_task,
+                                        portal_id,
+                                        project_id,
+                                        title=title,
+                                        description=desc,
+                                    ),
+                                    attempts=_env_retry_attempts(),
+                                    base_delay=_env_retry_base_delay(),
+                                )
+                                logger.info(
+                                    "Created Zoho task {} for {} (portal={}, project={})",
+                                    task_id,
+                                    f.name,
                                     portal_id,
                                     project_id,
-                                    title=title,
-                                    description=desc,
                                 )
-                                logger.info("Created Zoho task {} for {}", task_id, f.name)
                             except Exception as exc:  # noqa: BLE001
                                 logger.error("Failed to create task: {}", exc)
                         else:
@@ -218,7 +295,12 @@ def run_once(cfg: ZohoConfig) -> None:
         issues = _assess_document_quality(doc)
         if issues:
             draft = make_email_draft(doc.author, doc.name, issues)
-            logger.info("Drafting email for {}: {} issues", doc.name, len(issues))
+            logger.info(
+                "Drafting email for {}: {} issues (doc_id={})",
+                doc.name,
+                len(issues),
+                doc.id,
+            )
             print("--- New Email Draft ---")
             print(f"To: {draft.to}")
             print(f"Subject: {draft.subject}")
@@ -236,10 +318,24 @@ def run_once(cfg: ZohoConfig) -> None:
                         proj_svc = ProjectsService(ZohoClient(cfg))
                         title = f"Doc issues: {doc.name}"
                         desc = draft.body
-                        task_id = proj_svc.create_task(
-                            portal_id, project_id, title=title, description=desc
+                        task_id = _retry(
+                            partial(
+                                proj_svc.create_task,
+                                portal_id,
+                                project_id,
+                                title=title,
+                                description=desc,
+                            ),
+                            attempts=_env_retry_attempts(),
+                            base_delay=_env_retry_base_delay(),
                         )
-                        logger.info("Created Zoho task {} for {}", task_id, doc.name)
+                        logger.info(
+                            "Created Zoho task {} for {} (portal={}, project={})",
+                            task_id,
+                            doc.name,
+                            portal_id,
+                            project_id,
+                        )
                     except Exception as exc:  # noqa: BLE001
                         logger.error("Failed to create task: {}", exc)
                 else:
