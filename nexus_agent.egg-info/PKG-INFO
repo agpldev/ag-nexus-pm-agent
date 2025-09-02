@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: nexus-agent
+Version: 0.1.0
+Summary: Agentic AI workflow for Project Nexus (Healthcare) with Zoho integration
+Author: Agentic AI
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.6
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: requests>=2.32
+Requires-Dist: tenacity>=9.0
+Requires-Dist: loguru>=0.7
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Requires-Dist: pre-commit>=3.7; extra == "dev"
+Requires-Dist: detect-secrets>=1.5; extra == "dev"
