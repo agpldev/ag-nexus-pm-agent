@@ -34,6 +34,28 @@ class Document:
     author: str
 
 
+@dataclass(frozen=True)
+class EmailDraft:
+    """Structured email draft produced from analyzer findings."""
+
+    to: str
+    subject: str
+    body: str
+    issues: list[str]
+
+
+def make_email_draft(recipient: str, doc_name: str, issues: list[str]) -> EmailDraft:
+    """Create a templated `EmailDraft` for the given document and issues."""
+    subject = f"Review of your document: {doc_name}"
+    bullets = "\n- ".join(issues)
+    body = (
+        "Body:\nHello,\n\nI reviewed your document and found:\n- "
+        + bullets
+        + "\n\nThanks,\nNexus Agent"
+    )
+    return EmailDraft(to=recipient, subject=subject, body=body, issues=list(issues))
+
+
 def _mock_list_documents() -> list[Document]:
     """Temporary stub for WorkDrive/Projects documents."""
     return [
@@ -134,17 +156,12 @@ def run_once(cfg: ZohoConfig) -> None:
             for f in files:
                 issues = _assess_wdfile_quality(f)
                 if issues:
+                    draft = make_email_draft("project-docs@example.com", f.name, issues)
                     logger.info("Drafting email for {}: {} issues", f.name, len(issues))
                     print("--- New Email Draft ---")
-                    # Author unknown from WorkDrive list; placeholder address
-                    print("To: project-docs@example.com")
-                    print(f"Subject: Review of your document: {f.name}")
-                    bullets = "\n- ".join(issues)
-                    print(
-                        "Body:\nHello,\n\nI reviewed your document and found:\n- "
-                        + bullets
-                        + "\n\nThanks,\nNexus Agent"
-                    )
+                    print(f"To: {draft.to}")
+                    print(f"Subject: {draft.subject}")
+                    print(draft.body)
                     print("-----------------------")
                 else:
                     logger.info("No issues found for {}", f.name)
@@ -155,16 +172,12 @@ def run_once(cfg: ZohoConfig) -> None:
     for doc in docs:
         issues = _assess_document_quality(doc)
         if issues:
+            draft = make_email_draft(doc.author, doc.name, issues)
             logger.info("Drafting email for {}: {} issues", doc.name, len(issues))
             print("--- New Email Draft ---")
-            print(f"To: {doc.author}")
-            print(f"Subject: Review of your document: {doc.name}")
-            bullets = "\n- ".join(issues)
-            print(
-                "Body:\nHello,\n\nI reviewed your document and found:\n- "
-                + bullets
-                + "\n\nThanks,\nNexus Agent"
-            )
+            print(f"To: {draft.to}")
+            print(f"Subject: {draft.subject}")
+            print(draft.body)
             print("-----------------------")
         else:
             logger.info("No issues found for {}", doc.name)
