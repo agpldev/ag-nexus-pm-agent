@@ -69,6 +69,7 @@ Zoho credentials and endpoints are read from environment via `nexus_agent.config
 - Retry/backoff tunables:
   - `NEXUS_RETRY_ATTEMPTS` (default `3`, range `1-10`)
   - `NEXUS_RETRY_BASE_DELAY_MS` (default `500` ms)
+  - `NEXUS_TASKS_RPS` (task creation rate limit; default `2.0` rps, min `0.1`)
 
 Behavior:
 

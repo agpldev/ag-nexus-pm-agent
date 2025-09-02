@@ -148,9 +148,51 @@ def _env_retry_base_delay() -> float:
     raw = os.environ.get("NEXUS_RETRY_BASE_DELAY_MS", "500")
     try:
         ms = float(raw)
-        return max(0.05, min(ms, 5000.0)) / 1000.0
+        return max(0.01, ms / 1000.0)
     except ValueError:
         return 0.5
+
+
+def _env_tasks_rps() -> float:
+    """Read task creation rate limit in requests per second.
+
+    Defaults to 2.0 rps. Minimum 0.1 rps.
+    """
+    try:
+        rps = float(os.environ.get("NEXUS_TASKS_RPS", "2.0"))
+    except ValueError:
+        rps = 2.0
+    return max(0.1, rps)
+
+
+class TokenBucket:
+    """Simple token-bucket rate limiter.
+
+    Fills at `rate` tokens/sec up to `capacity` tokens. `consume(1)` will block
+    (sleep) until a token is available.
+    """
+
+    def __init__(self, rate: float, capacity: int | None = None) -> None:
+        self.rate = max(0.1, rate)
+        cap = int(capacity if capacity is not None else max(1, int(rate)))
+        self.capacity = max(1, cap)
+        self.tokens = float(self.capacity)
+        self.last = time.monotonic()
+
+    def consume(self, amount: float = 1.0) -> None:
+        while True:
+            now = time.monotonic()
+            elapsed = now - self.last
+            self.last = now
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+            if self.tokens >= amount:
+                self.tokens -= amount
+                return
+            # need to wait; compute time to next token
+            needed = amount - self.tokens
+            sleep_for = needed / self.rate
+            logger.info("Rate limit: sleeping {:.3f}s", sleep_for)
+            time.sleep(sleep_for)
 
 
 def _retry(func, *, attempts: int, base_delay: float, factor: float = 2.0):  # type: ignore[no-untyped-def]
@@ -222,6 +264,7 @@ def run_once(cfg: ZohoConfig) -> None:
         # Live path: list files via WorkDrive for a configured folder
         workdrive = WorkDriveService(client)
         created_task_keys: set[tuple[str, str, str]] = set()
+        task_bucket = TokenBucket(_env_tasks_rps())
 
         folder_id: str | None = os.environ.get("WORKDRIVE_FOLDER_ID")
         if not folder_id:
@@ -272,6 +315,8 @@ def run_once(cfg: ZohoConfig) -> None:
                                         project_id,
                                     )
                                     continue
+                                # rate limit task creation
+                                task_bucket.consume()
                                 task_id = _retry(
                                     partial(
                                         proj_svc.create_task,
@@ -340,6 +385,8 @@ def run_once(cfg: ZohoConfig) -> None:
                                 project_id,
                             )
                             continue
+                        # rate limit task creation
+                        task_bucket.consume()
                         task_id = _retry(
                             partial(
                                 proj_svc.create_task,
