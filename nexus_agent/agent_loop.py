@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Protocol
 
 from loguru import logger
 
@@ -42,25 +43,49 @@ def _mock_list_documents() -> list[Document]:
     ]
 
 
+class NameAnalyzer(Protocol):
+    """Protocol for analyzing names (file/document) and returning issue strings.
+
+    Implementations should be fast, deterministic, and side-effect free.
+    """
+
+    def assess(self, name: str) -> list[str]:
+        """Return a list of human-readable issues for the given name."""
+
+
+class SimpleNameAnalyzer:
+    """Baseline analyzer replicating prior heuristic checks for names."""
+
+    def assess(self, name: str) -> list[str]:
+        issues: list[str] = []
+        if "." not in name:
+            issues.append("Missing file extension")
+        if len(name.split(".")[0]) < 5:
+            issues.append("Document title is too short")
+        return issues
+
+
+def get_default_analyzer() -> NameAnalyzer:
+    """Factory for the default analyzer implementation.
+
+    This indirection enables future injection or configuration without API churn.
+    """
+    return SimpleNameAnalyzer()
+
+
 def _assess_document_quality(doc: Document) -> list[str]:
-    """Toy quality checks until real analyzers are integrated."""
-    issues: list[str] = []
-    if "." not in doc.name:
-        issues.append("Missing file extension")
-    if len(doc.name.split(".")[0]) < 5:
-        issues.append("Document title is too short")
-    return issues
+    """Assess quality of a `Document` using the default analyzer.
+
+    Kept for backward compatibility with existing tests.
+    """
+    analyzer = get_default_analyzer()
+    return analyzer.assess(doc.name)
 
 
 def _assess_wdfile_quality(file: WDFile) -> list[str]:
-    """Quality checks adapted for WorkDrive file objects."""
-    issues: list[str] = []
-    name = file.name
-    if "." not in name:
-        issues.append("Missing file extension")
-    if len(name.split(".")[0]) < 5:
-        issues.append("Document title is too short")
-    return issues
+    """Assess quality of a WorkDrive file using the default analyzer."""
+    analyzer = get_default_analyzer()
+    return analyzer.assess(file.name)
 
 
 def run_once(cfg: ZohoConfig) -> None:
