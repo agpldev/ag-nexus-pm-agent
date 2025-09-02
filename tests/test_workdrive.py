@@ -60,7 +60,7 @@ class _DummyClient(ZohoClient):
 
 
 def test_list_files_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    import requests  # noqa: WPS433
+    import requests
 
     payload = {
         "data": [

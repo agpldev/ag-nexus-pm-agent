@@ -183,6 +183,31 @@ def run_once(cfg: ZohoConfig) -> None:
                     print(f"Subject: {draft.subject}")
                     print(draft.body)
                     print("-----------------------")
+                    if os.environ.get("NEXUS_CREATE_TASKS", "false").lower() in [
+                        "1",
+                        "true",
+                        "yes",
+                    ]:
+                        portal_id = os.environ.get("ZOHO_PORTAL_ID")
+                        project_id = os.environ.get("ZOHO_PROJECT_ID")
+                        if portal_id and project_id:
+                            try:
+                                proj_svc = ProjectsService(client)
+                                title = f"Doc issues: {f.name}"
+                                desc = draft.body
+                                task_id = proj_svc.create_task(
+                                    portal_id,
+                                    project_id,
+                                    title=title,
+                                    description=desc,
+                                )
+                                logger.info("Created Zoho task {} for {}", task_id, f.name)
+                            except Exception as exc:  # noqa: BLE001
+                                logger.error("Failed to create task: {}", exc)
+                        else:
+                            logger.warning(
+                                "NEXUS_CREATE_TASKS=true but ZOHO_PORTAL_ID/ZOHO_PROJECT_ID not set"
+                            )
                 else:
                     logger.info("No issues found for {}", f.name)
             return
@@ -199,6 +224,28 @@ def run_once(cfg: ZohoConfig) -> None:
             print(f"Subject: {draft.subject}")
             print(draft.body)
             print("-----------------------")
+            if os.environ.get("NEXUS_CREATE_TASKS", "false").lower() in {
+                "1",
+                "true",
+                "yes",
+            }:
+                portal_id = os.environ.get("ZOHO_PORTAL_ID")
+                project_id = os.environ.get("ZOHO_PROJECT_ID")
+                if portal_id and project_id:
+                    try:
+                        proj_svc = ProjectsService(ZohoClient(cfg))
+                        title = f"Doc issues: {doc.name}"
+                        desc = draft.body
+                        task_id = proj_svc.create_task(
+                            portal_id, project_id, title=title, description=desc
+                        )
+                        logger.info("Created Zoho task {} for {}", task_id, doc.name)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error("Failed to create task: {}", exc)
+                else:
+                    logger.warning(
+                        "NEXUS_CREATE_TASKS=true but ZOHO_PORTAL_ID/ZOHO_PROJECT_ID not set"
+                    )
         else:
             logger.info("No issues found for {}", doc.name)
 

@@ -52,3 +52,37 @@ class ProjectsService:
             name = str(it.get("name"))
             results.append(Project(id=pid, name=name))
         return results
+
+    def create_task(
+        self,
+        portal_id: str,
+        project_id: str,
+        *,
+        title: str,
+        description: str | None = None,
+    ) -> str:
+        """Create a task in a Zoho Project and return its ID.
+
+        Args:
+            portal_id: Zoho portal identifier.
+            project_id: Target project identifier.
+            title: Task title.
+            description: Optional detailed description/notes.
+
+        Returns:
+            The created task ID as a string.
+        """
+        headers = self._client.auth_header()
+        base = self._client.api_base
+        url = f"{base}/projects/v1/portals/{portal_id}/projects/{project_id}/tasks/"
+        payload: dict[str, object] = {"name": title}
+        if description:
+            payload["description"] = description
+        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        task = data.get("task") or {}
+        task_id = str(task.get("id"))
+        if not task_id or task_id == "None":  # defensive
+            raise RuntimeError("Task creation response missing id")
+        return task_id
