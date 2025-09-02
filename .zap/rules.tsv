@@ -1,0 +1,11 @@
+# RuleId	Threshold	Action	Justification
+10010	WARN	IGNORE	Cookie without HttpOnly is often acceptable for non-session cookies in baseline scan
+10015	WARN	IGNORE	Server leak info header often false positive on baseline
+10027	WARN	IGNORE	Header X-Frame-Options missing flagged; reviewed at app layer
+10020	WARN	IGNORE	Anti-CSRF tokens not applicable for passive baseline
+10021	WARN	IGNORE	X-Content-Type-Options missing; handled at reverse proxy
+10023	WARN	IGNORE	X-Content-Security-Policy deprecated header
+10024	WARN	IGNORE	X-Frame-Options duplicate warnings
+10054	WARN	IGNORE	Cookie without SameSite may be acceptable in some contexts
+10096	WARN	IGNORE	Timestamp disclosure low risk in baseline
+10106	WARN	IGNORE	Strict-Transport-Security missing on non-prod targets
